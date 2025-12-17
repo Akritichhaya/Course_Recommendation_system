@@ -216,7 +216,7 @@ if past_courses:
 else:
     st.sidebar.info("Cold-start user")
 
-top_n = st.sidebar.slider("Number of Recommendations", 1, 20, 10)
+top_n = st.sidebar.slider("Number of Recommendations", 1, 10)
 btn = st.sidebar.button("Get Recommendations")
 
 # ======================================================
