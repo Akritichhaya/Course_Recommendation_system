@@ -16,7 +16,7 @@ st.set_page_config(
 # ======================================================
 @st.cache_data
 def load_data():
-    DATA_PATH = r"D:\Recommendation_system\online_course_recommendation_v2.csv"
+    DATA_PATH = r"online_course_recommendation_v2.csv"
     return pd.read_csv(DATA_PATH)
 
 df = load_data()
