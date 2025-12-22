@@ -6,7 +6,7 @@ Hybrid Recommendation System using Domain-Based and Collaborative Filtering
 </p>
 
 
-<p align="center">
+<p align="left">
   <a href="https://courserecommendationsystem-reoa2azqwjyjr7xhodzy7n.streamlit.app/" target="_blank">
     <img src="https://img.shields.io/badge/🚀%20Live%20Demo-Streamlit-red?style=for-the-badge">
   </a>
