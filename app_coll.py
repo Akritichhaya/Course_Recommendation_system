@@ -1,250 +1,3 @@
-# import streamlit as st
-# import pandas as pd
-# import numpy as np
-
-# # ======================================================
-# # PAGE CONFIG
-# # ======================================================
-# st.set_page_config(
-#     page_title="Course Recommendation System",
-#     page_icon="🎓",
-#     layout="wide"
-# )
-
-# # ======================================================
-# # LOAD DATA
-# # ======================================================
-# @st.cache_data
-# def load_data():
-#     DATA_PATH = r"online_course_recommendation_v2.csv"
-#     return pd.read_csv(DATA_PATH)
-
-# df = load_data()
-
-# # ======================================================
-# # DOMAIN EXTRACTION (STRONG, DATA-AWARE)
-# # ======================================================
-# def extract_domain(course_name):
-#     name = str(course_name).lower()
-
-#     if any(k in name for k in ["python", "machine learning", "ml", "ai", "data"]):
-#         return "Programming"
-
-#     if any(k in name for k in ["devops", "deployment", "ci/cd", "cloud", "aws", "azure"]):
-#         return "DevOps"
-
-#     if any(k in name for k in ["network", "system", "cyber", "security"]):
-#         return "Networking"
-
-#     if any(k in name for k in ["blockchain", "crypto", "decentralized"]):
-#         return "Blockchain"
-
-#     if any(k in name for k in ["finance", "trading", "stock"]):
-#         return "Finance"
-
-#     if any(k in name for k in ["marketing"]):
-#         return "Marketing"
-
-#     if any(k in name for k in ["design", "canva", "graphic"]):
-#         return "Design"
-
-#     if any(k in name for k in ["fitness", "nutrition"]):
-#         return "Health"
-
-#     return "Other"
-
-# df["domain"] = df["course_name"].apply(extract_domain)
-
-# # ======================================================
-# # USER → COURSE MAPPING
-# # ======================================================
-# df_cf = df[["user_id", "course_id", "course_name"]].drop_duplicates()
-
-# @st.cache_data
-# def build_user_courses(data):
-#     return data.groupby("user_id")["course_id"].apply(set).to_dict()
-
-# user_courses = build_user_courses(df_cf)
-
-# # ======================================================
-# # COLLABORATIVE FILTERING (SUPPORTING ROLE)
-# # ======================================================
-# def get_similar_users(user_id):
-#     if user_id not in user_courses:
-#         return []
-
-#     target_courses = user_courses[user_id]
-#     return [
-#         uid for uid, courses in user_courses.items()
-#         if uid != user_id and len(courses & target_courses) > 0
-#     ]
-
-# def collaborative_recommend(user_id, n=10):
-#     if user_id not in user_courses or len(user_courses[user_id]) == 0:
-#         return []
-
-#     similar_users = get_similar_users(user_id)
-
-#     candidates = (
-#         df_cf[df_cf["user_id"].isin(similar_users)]
-#         .loc[~df_cf["course_id"].isin(user_courses[user_id])]
-#     )
-
-#     return candidates["course_name"].value_counts().head(n).index.tolist()
-
-# # # ======================================================
-# # # POPULARITY MODEL (COLD START)
-# # # ======================================================
-# # def popularity_recommend(top_n):
-# #     temp = (
-# #         df.groupby("course_name", as_index=False)
-# #         .agg({"rating": "mean", "enrollment_numbers": "max"})
-# #     )
-
-# #     temp["score"] = temp["rating"] * np.log(temp["enrollment_numbers"] + 1)
-
-# #     return (
-# #         temp.sort_values(by="score", ascending=False)
-# #         .head(top_n)
-# #         .reset_index(drop=True)
-# #     )
-
-# # ======================================================
-# # 🔥 TWO-STAGE HYBRID RECOMMENDER (85% DOMAIN + 15% CF)
-# # ======================================================
-# def hybrid_recommend(user_id, top_n):
-#     # -------- Cold Start --------
-#     if user_id not in user_courses or len(user_courses[user_id]) == 0:
-#         return popularity_recommend(top_n)
-
-#     # -------- User Domains --------
-#     user_domains = set(df[df["user_id"] == user_id]["domain"])
-
-#     # =============================
-#     # STAGE 1: DOMAIN-BASED (85%)
-#     # =============================
-#     domain_df = df[
-#         (df["domain"].isin(user_domains)) &
-#         (~df["course_name"].isin(
-#             df[df["user_id"] == user_id]["course_name"]
-#         ))
-#     ]
-
-#     domain_ranked = (
-#         domain_df.groupby("course_name", as_index=False)
-#         .agg({
-#             "rating": "mean",
-#             "enrollment_numbers": "max"
-#         })
-#     )
-
-#     domain_ranked["score"] = (
-#         domain_ranked["rating"] *
-#         np.log(domain_ranked["enrollment_numbers"] + 1)
-#     )
-
-#     domain_ranked = domain_ranked.sort_values(
-#         by="score", ascending=False
-#     )
-
-#     domain_k = max(1, int(top_n * 0.85))
-#     domain_results = domain_ranked.head(domain_k)
-
-#     # =============================
-#     # STAGE 2: COLLABORATIVE (15%)
-#     # =============================
-#     collab_courses = collaborative_recommend(user_id, n=top_n * 2)
-
-#     collab_df = df[
-#         (df["course_name"].isin(collab_courses)) &
-#         (~df["course_name"].isin(domain_results["course_name"])) &
-#         (~df["course_name"].isin(
-#             df[df["user_id"] == user_id]["course_name"]
-#         ))
-#     ]
-
-#     collab_ranked = (
-#         collab_df.groupby("course_name", as_index=False)
-#         .agg({
-#             "rating": "mean",
-#             "enrollment_numbers": "max"
-#         })
-#     )
-
-#     collab_ranked["score"] = (
-#         collab_ranked["rating"] *
-#         np.log(collab_ranked["enrollment_numbers"] + 1)
-#     )
-
-#     collab_ranked = collab_ranked.sort_values(
-#         by="score", ascending=False
-#     )
-
-#     collab_k = top_n - len(domain_results)
-#     collab_results = collab_ranked.head(collab_k)
-
-#     # =============================
-#     # FINAL MERGE (ORDER PRESERVED)
-#     # =============================
-#     final_df = pd.concat(
-#         [domain_results, collab_results],
-#         ignore_index=True
-#     )
-
-#     return final_df[["course_name", "rating", "enrollment_numbers"]]
-
-# # ======================================================
-# # SIDEBAR UI
-# # ======================================================
-# st.sidebar.title("🎓 Course Recommender")
-
-# user_id = st.sidebar.selectbox(
-#     "Select User ID",
-#     sorted(df_cf["user_id"].unique())
-# )
-
-# st.sidebar.subheader("📘 Previously Enrolled Courses")
-# past_courses = (
-#     df[df["user_id"] == user_id]["course_name"]
-#     .drop_duplicates()
-#     .tolist()
-# )
-
-# if past_courses:
-#     for c in past_courses:
-#         st.sidebar.markdown(f"• {c}")
-# else:
-#     st.sidebar.info("Cold-start user")
-
-# top_n = st.sidebar.slider("Number of Recommendations", 1, 10)
-# btn = st.sidebar.button("Get Recommendations")
-
-# # ======================================================
-# # MAIN OUTPUT
-# # ======================================================
-# st.title("📚 Recommended Courses")
-
-# st.markdown("""
-# **Recommendation Strategy**
-# - **85% Domain-based recommendations (shown first)**
-# - **15% Collaborative recommendations (shown last)**
-
-# """)
-
-# if btn:
-#     recs = hybrid_recommend(user_id, top_n)
-#     st.dataframe(recs, use_container_width=True)
-
-# st.markdown("---")
-# st.caption(
-#     "Two-stage hybrid recommendation system: "
-#     "domain-first ranking with collaborative tail support."
-# )
-
-
-
-
-
 
 import streamlit as st
 import pandas as pd
@@ -254,10 +7,20 @@ import numpy as np
 # PAGE CONFIG
 # -------------------------------------------------------
 st.set_page_config(
-    page_title="Course Recommender",
+    page_title="Hybrid Course Recommendation System",
     page_icon="🎓",
     layout="wide"
 )
+
+st.title("🎓 Course Recommendation System")
+st.markdown("""
+**Hybrid Recommendation System Features:**
+
+- Uses Domain-based and Collaborative Filtering
+- 75% Domain-based recommendations (shown first)
+- 15% Collaborative recommendations (shown last)
+- Dynamic Cold-Start handling for new users
+""")
 
 # -------------------------------------------------------
 # LOAD DATA
@@ -285,28 +48,40 @@ def extract_domain(course_name):
         return "Marketing"
     if any(k in name for k in ["design", "canva", "graphic"]):
         return "Design"
-
     return "Other"
 
 df["domain"] = df["course_name"].apply(extract_domain)
 
 # -------------------------------------------------------
-# USER → COURSE MAPPING
+# USER → COURSE MAPPINGS
 # -------------------------------------------------------
-user_courses = df.groupby("user_id")["course_name"].apply(list).to_dict()
+
+# Internal logic (course_id)
+user_courses_id = (
+    df.groupby("user_id")["course_id"]
+    .apply(set)
+    .to_dict()
+)
+
+# UI display (course_name)
+user_courses_name = (
+    df.groupby("user_id")["course_name"]
+    .apply(list)
+    .to_dict()
+)
 
 # -------------------------------------------------------
-# COLLABORATIVE FILTERING HELPERS
+# COLLABORATIVE FILTERING
 # -------------------------------------------------------
 def get_similar_users(target_user_id):
-    if target_user_id not in user_courses:
+    if target_user_id not in user_courses_id:
         return []
 
-    target_courses = set(user_courses[target_user_id])
+    target_courses = user_courses_id[target_user_id]
 
     return [
-        user_id for user_id, courses in user_courses.items()
-        if user_id != target_user_id and len(set(courses) & target_courses) > 0
+        uid for uid, courses in user_courses_id.items()
+        if uid != target_user_id and len(courses & target_courses) > 0
     ]
 
 
@@ -316,8 +91,11 @@ def collaborative_recommend(user_id):
     if not similar_users:
         return []
 
+    taken_courses = user_courses_id.get(user_id, set())
+
     return (
         df[df["user_id"].isin(similar_users)]
+        .loc[~df["course_id"].isin(taken_courses)]
         ["course_name"]
         .value_counts()
         .index
@@ -325,136 +103,159 @@ def collaborative_recommend(user_id):
     )
 
 # -------------------------------------------------------
-# HYBRID RECOMMENDATION FUNCTION
+# DOMAIN-BASED RECOMMENDATION
 # -------------------------------------------------------
-def hybrid_recommend(user_id, top_n):
+def domain_recommend(user_id, top_n):
 
-    taken_courses = set(user_courses.get(user_id, []))
+    taken_courses = user_courses_id.get(user_id, set())
     user_domains = set(df[df["user_id"] == user_id]["domain"])
 
-    # ---------------- DOMAIN BASED (85%) ----------------
     domain_df = df[
         (df["domain"].isin(user_domains)) &
-        (~df["course_name"].isin(taken_courses))
+        (~df["course_id"].isin(taken_courses))
     ]
 
-    domain_ranked = (
-        domain_df.groupby(
-            ["course_name", "difficulty_level"],
-            as_index=False
-        )
+    ranked = (
+        domain_df.groupby("course_name", as_index=False)
         .agg({
             "rating": "mean",
             "enrollment_numbers": "max"
         })
     )
 
-    domain_ranked["score"] = (
-        domain_ranked["rating"] *
-        np.log(domain_ranked["enrollment_numbers"] + 1)
+    ranked["score"] = ranked["rating"] * np.log(ranked["enrollment_numbers"] + 1)
+
+    return ranked.sort_values(by="score", ascending=False).head(top_n)
+
+# -------------------------------------------------------
+# POPULARITY-BASED MODEL (COLD START)
+# -------------------------------------------------------
+def popularity_recommend(top_n):
+
+    pop_df = (
+        df.groupby("course_name", as_index=False)
+        .agg({
+            "rating": "mean",
+            "enrollment_numbers": "max"
+        })
     )
 
-    domain_ranked = domain_ranked.sort_values(
-        by="score", ascending=False
-    )
+    pop_df["score"] = pop_df["rating"] * np.log(pop_df["enrollment_numbers"] + 1)
 
-    domain_k = int(top_n * 0.85)
-    domain_results = domain_ranked.head(domain_k)
+    return pop_df.sort_values(by="score", ascending=False).head(top_n)
 
-    # ---------------- COLLABORATIVE (15%) ----------------
+# -------------------------------------------------------
+# HYBRID MODEL
+# -------------------------------------------------------
+def hybrid_recommend(user_id, top_n):
+
+    # 🔴 Cold-start user
+    if user_id not in user_courses_id:
+        return popularity_recommend(top_n)
+
+    # -------- Domain Based (75%) --------
+    domain_k = int(top_n * 0.75)
+    domain_part = domain_recommend(user_id, domain_k)
+
+    # -------- Collaborative (15%) --------
     collab_courses = collaborative_recommend(user_id)
 
     collab_df = df[
         (df["course_name"].isin(collab_courses)) &
-        (~df["course_name"].isin(domain_results["course_name"])) &
-        (~df["course_name"].isin(taken_courses))
+        (~df["course_name"].isin(domain_part["course_name"]))
     ]
 
-    collab_ranked = (
-        collab_df.groupby(
-            ["course_name", "difficulty_level"],
-            as_index=False
-        )
+    collab_part = (
+        collab_df.groupby("course_name", as_index=False)
         .agg({
             "rating": "mean",
             "enrollment_numbers": "max"
         })
     )
 
-    collab_ranked["score"] = (
-        collab_ranked["rating"] *
-        np.log(collab_ranked["enrollment_numbers"] + 1)
+    collab_part["score"] = (
+        collab_part["rating"] * np.log(collab_part["enrollment_numbers"] + 1)
     )
 
-    collab_ranked = collab_ranked.sort_values(
+    collab_part = collab_part.sort_values(
         by="score", ascending=False
-    )
+    ).head(top_n - len(domain_part))
 
-    collab_k = top_n - len(domain_results)
-    collab_results = collab_ranked.head(collab_k)
-
-    # ---------------- FINAL ----------------
-    final = pd.concat(
-        [domain_results, collab_results],
-        ignore_index=True
-    )
-
-    return final[
-        [
-            "course_name",
-            "difficulty_level",
-            "rating",
-            "enrollment_numbers"
-        ]
-    ]
+    return pd.concat([domain_part, collab_part], ignore_index=True)
 
 # -------------------------------------------------------
 # SIDEBAR UI
 # -------------------------------------------------------
-st.sidebar.title("🎓 Course Recommender")
 
-selected_user_id = st.sidebar.selectbox(
+# -------------------------------------------------------
+# USER DROPDOWN (Enrolled / Not Enrolled)
+# -------------------------------------------------------
+
+st.sidebar.title("🔍 User Selection")
+
+# 1️⃣ Decide which user IDs you want to show
+user_ids_to_show = list(range(1, 50000))  # 71–78 (you can change this)
+
+# 2️⃣ Enrolled users from CSV
+enrolled_users = set(df["user_id"].unique())
+
+# 3️⃣ Build dropdown options
+user_dropdown_options = []
+
+for uid in user_ids_to_show:
+    if uid in enrolled_users:
+        user_dropdown_options.append(f"{uid} (Enrolled)")
+    else:
+        user_dropdown_options.append(f"{uid} (Not Enrolled)")
+
+# 4️⃣ Dropdown
+selected_label = st.sidebar.selectbox(
     "Select User ID",
-    sorted(df["user_id"].unique())
+    user_dropdown_options
 )
 
-st.sidebar.markdown("### 📘 Previously Enrolled Courses")
+selected_user_id = int(selected_label.split()[0])
 
-enrolled_courses = user_courses.get(selected_user_id, [])
-
-if enrolled_courses:
-    for course in enrolled_courses:
-        st.sidebar.markdown(f"• {course}")
-else:
-    st.sidebar.info("No enrolled courses found")
 
 top_n = st.sidebar.slider(
     "Number of Recommendations",
     min_value=1,
     max_value=10,
-    value=5
+    value=6
 )
 
 # -------------------------------------------------------
-# MAIN AREA
+# SIDEBAR: PREVIOUSLY ENROLLED COURSES
 # -------------------------------------------------------
-st.markdown("## 📚 Recommended Courses")
+st.sidebar.markdown("### 📘 Previously Enrolled Courses")
 
-st.markdown("""
-**Recommendation Strategy**
-- 85% Domain-based recommendations (shown first)
-- 15% Collaborative recommendations (shown last)
-""")
+if selected_user_id in user_courses_name:
+    for course in user_courses_name[selected_user_id]:
+        st.sidebar.markdown(f"• {course}")
+else:
+    st.sidebar.info("No enrolled courses found (New User)")
+
+# -------------------------------------------------------
+# MAIN OUTPUT
+# -------------------------------------------------------
+st.subheader("📌 Recommendation Results")
+
+is_new_user = selected_user_id not in df["user_id"].values
+
+if is_new_user:
+    st.info("👤 New User Detected → Popularity-Based Recommendations")
+else:
+    st.success("✅ Enrolled User → Hybrid Recommendations")
 
 if st.sidebar.button("Get Recommendations"):
-    recommendations = hybrid_recommend(selected_user_id, top_n)
+    result = hybrid_recommend(selected_user_id, top_n)
 
     st.dataframe(
-        recommendations.rename(columns={
+        result.rename(columns={
             "course_name": "Course Name",
-            "difficulty_level": "Difficulty",
             "rating": "Avg Rating",
-            "enrollment_numbers": "Enrollments"
+            "enrollment_numbers": "Enrollments",
+            "score": "Relevance Score"
         }),
         use_container_width=True
     )
@@ -464,5 +265,7 @@ if st.sidebar.button("Get Recommendations"):
 # -------------------------------------------------------
 st.markdown("---")
 st.caption(
-    "Two-stage hybrid recommendation system: domain-first ranking with collaborative tail support."
+    # **Recommendation Strategy**
+    
+    "for all unseen users using a Popularity-based model."
 )
