@@ -1,16 +1,16 @@
 <h1 align="center">🎓 COURSE RECOMMENDATION SYSTEM</h1>
-<p align="center">
-  <a href="https://courserecommendationsystem-reoa2azqwjyjr7xhodzy7n.streamlit.app/" target="_blank">
-    <img src="https://img.shields.io/badge/🚀%20Live%20Demo-Streamlit-red?style=for-the-badge">
-  </a>
-</p>
+
 
 <p align="center" style="font-size:16px; font-weight:500;">
 Hybrid Recommendation System using Domain-Based and Collaborative Filtering
 </p>
 
-<hr>
 
+<p align="center">
+  <a href="https://courserecommendationsystem-reoa2azqwjyjr7xhodzy7n.streamlit.app/" target="_blank">
+    <img src="https://img.shields.io/badge/🚀%20Live%20Demo-Streamlit-red?style=for-the-badge">
+  </a>
+</p>
 <h2>📌 <b>PROJECT DESCRIPTION</b></h2>
 <p style="font-size:15px; font-weight:500;">
 This project implements a <b>Hybrid Course Recommendation System</b> that recommends online courses
